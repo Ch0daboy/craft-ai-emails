@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { Menu, X, User, LogOut } from "lucide-react";
+import { Menu, X, User, LogOut, LayoutDashboard } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { isAuthenticated, apiClient, clearAuth } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import AuthDialog from "./AuthDialog";
@@ -10,6 +11,8 @@ const Header = () => {
   const [isUserAuthenticated, setIsUserAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState<string>("");
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -65,18 +68,37 @@ const Header = () => {
 
           {/* Navigation */}
           <nav className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-white/80 hover:text-white transition-colors">
-              Features
-            </a>
-            <a href="#templates" className="text-white/80 hover:text-white transition-colors">
-              Templates
-            </a>
-            <a href="#pricing" className="text-white/80 hover:text-white transition-colors">
-              Pricing
-            </a>
-            <a href="#docs" className="text-white/80 hover:text-white transition-colors">
-              Docs
-            </a>
+            {isUserAuthenticated && (
+              <button 
+                onClick={() => navigate("/dashboard")} 
+                className={`text-white/80 hover:text-white transition-colors ${location.pathname === '/dashboard' ? 'text-white font-semibold' : ''}`}
+              >
+                Dashboard
+              </button>
+            )}
+            {location.pathname !== '/' ? (
+              <button 
+                onClick={() => navigate("/")} 
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                Generator
+              </button>
+            ) : (
+              <>
+                <a href="#features" className="text-white/80 hover:text-white transition-colors">
+                  Features
+                </a>
+                <a href="#templates" className="text-white/80 hover:text-white transition-colors">
+                  Templates
+                </a>
+                <a href="#pricing" className="text-white/80 hover:text-white transition-colors">
+                  Pricing
+                </a>
+                <a href="#docs" className="text-white/80 hover:text-white transition-colors">
+                  Docs
+                </a>
+              </>
+            )}
           </nav>
 
           {/* Auth Buttons */}
@@ -86,6 +108,16 @@ const Header = () => {
                 <span className="text-white/80 text-sm">
                   {userEmail}
                 </span>
+                {location.pathname !== '/dashboard' && (
+                  <Button 
+                    variant="ghost" 
+                    className="text-white hover:bg-white/10"
+                    onClick={() => navigate("/dashboard")}
+                  >
+                    <LayoutDashboard className="h-4 w-4 mr-2" />
+                    Dashboard
+                  </Button>
+                )}
                 <Button 
                   variant="ghost" 
                   className="text-white hover:bg-white/10"
@@ -125,24 +157,53 @@ const Header = () => {
         {isMenuOpen && (
           <div className="md:hidden mt-4 pb-4 border-t border-white/20">
             <nav className="flex flex-col gap-4 mt-4">
-              <a href="#features" className="text-white/80 hover:text-white transition-colors">
-                Features
-              </a>
-              <a href="#templates" className="text-white/80 hover:text-white transition-colors">
-                Templates
-              </a>
-              <a href="#pricing" className="text-white/80 hover:text-white transition-colors">
-                Pricing
-              </a>
-              <a href="#docs" className="text-white/80 hover:text-white transition-colors">
-                Docs
-              </a>
+              {isUserAuthenticated && (
+                <button 
+                  onClick={() => navigate("/dashboard")} 
+                  className={`text-white/80 hover:text-white transition-colors text-left ${location.pathname === '/dashboard' ? 'text-white font-semibold' : ''}`}
+                >
+                  Dashboard
+                </button>
+              )}
+              {location.pathname !== '/' ? (
+                <button 
+                  onClick={() => navigate("/")} 
+                  className="text-white/80 hover:text-white transition-colors text-left"
+                >
+                  Generator
+                </button>
+              ) : (
+                <>
+                  <a href="#features" className="text-white/80 hover:text-white transition-colors">
+                    Features
+                  </a>
+                  <a href="#templates" className="text-white/80 hover:text-white transition-colors">
+                    Templates
+                  </a>
+                  <a href="#pricing" className="text-white/80 hover:text-white transition-colors">
+                    Pricing
+                  </a>
+                  <a href="#docs" className="text-white/80 hover:text-white transition-colors">
+                    Docs
+                  </a>
+                </>
+              )}
               <div className="flex flex-col gap-2 pt-4 border-t border-white/20">
                 {isUserAuthenticated ? (
                   <>
                     <div className="text-white/80 text-sm px-2 py-1">
                       {userEmail}
                     </div>
+                    {location.pathname !== '/dashboard' && (
+                      <Button 
+                        variant="ghost" 
+                        className="text-white hover:bg-white/10 justify-start"
+                        onClick={() => navigate("/dashboard")}
+                      >
+                        <LayoutDashboard className="h-4 w-4 mr-2" />
+                        Dashboard
+                      </Button>
+                    )}
                     <Button 
                       variant="ghost" 
                       className="text-white hover:bg-white/10 justify-start"
