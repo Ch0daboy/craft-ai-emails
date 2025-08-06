@@ -2,18 +2,31 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
-import { Sparkles, Download, Eye, Copy } from "lucide-react";
+import { Sparkles, Download, Eye, Copy, AlertCircle, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { validatePrompt, sanitizeHTML, validateEmailHTML, createSafeErrorMessage, VALIDATION_LIMITS } from "@/lib/security";
+import { apiClient, handleApiError, GenerateTemplateResponse, isAuthenticated } from "@/lib/api";
 
 const TemplateGenerator = () => {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedTemplate, setGeneratedTemplate] = useState("");
+  const [generationData, setGenerationData] = useState<GenerateTemplateResponse['data'] | null>(null);
   const { toast } = useToast();
+  const isUserAuthenticated = isAuthenticated();
 
   const handleGenerate = async () => {
     try {
+      // Check if user is authenticated
+      if (!isUserAuthenticated) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to generate email templates.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Validate input
       const validation = validatePrompt(prompt);
       if (!validation.isValid) {
@@ -27,62 +40,41 @@ const TemplateGenerator = () => {
 
       setIsGenerating(true);
       
-      // Simulate API call - in real app, this would call AWS Bedrock
-      setTimeout(() => {
-        try {
-          const mockHTML = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generated Email Template</title>
-    <style>
-        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-        .container { max-width: 600px; margin: 0 auto; background: #ffffff; }
-        .header { background: linear-gradient(135deg, #8b5cf6, #3b82f6); padding: 40px 20px; text-align: center; }
-        .header h1 { color: white; margin: 0; font-size: 28px; }
-        .content { padding: 40px 20px; }
-        .cta { background: #8b5cf6; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Welcome to Our Newsletter!</h1>
-        </div>
-        <div class="content">
-            <h2>Thank you for subscribing</h2>
-            <p>We're excited to have you join our community. Get ready for amazing content, exclusive offers, and insider updates delivered straight to your inbox.</p>
-            <a href="#" class="cta">Get Started</a>
-            <p>Best regards,<br>The EmailCraft Team</p>
-        </div>
-    </div>
-</body>
-</html>`;
-          
-          // Sanitize and validate the generated HTML
-          const sanitizedHTML = sanitizeHTML(mockHTML);
-          const htmlValidation = validateEmailHTML(sanitizedHTML);
-          
-          if (!htmlValidation.isValid) {
-            throw new Error(htmlValidation.error);
-          }
-          
-          setGeneratedTemplate(sanitizedHTML);
-          setIsGenerating(false);
-          toast({
-            title: "Template generated!",
-            description: "Your email template is ready for preview and export."
-          });
-        } catch (error) {
-          setIsGenerating(false);
-          toast({
-            title: "Generation failed",
-            description: createSafeErrorMessage(error),
-            variant: "destructive"
-          });
+      try {
+        // Call real API to generate template
+        const response = await apiClient.generateTemplate({
+          prompt: prompt.trim(),
+          emailType: 'newsletter', // Default for now
+          responsive: true,
+          includeImages: true,
+        });
+
+        // Sanitize and validate the generated HTML
+        const sanitizedHTML = sanitizeHTML(response.data.template.htmlContent);
+        const htmlValidation = validateEmailHTML(sanitizedHTML);
+        
+        if (!htmlValidation.isValid) {
+          throw new Error(htmlValidation.error);
         }
-      }, 2000);
+        
+        setGeneratedTemplate(sanitizedHTML);
+        setGenerationData(response.data);
+        setIsGenerating(false);
+        
+        toast({
+          title: "Template generated! 🎉",
+          description: `Used ${response.data.generation.tokensUsed.total} tokens. ${response.data.user.tokensRemaining} tokens remaining.`
+        });
+      } catch (apiError) {
+        setIsGenerating(false);
+        const errorMessage = handleApiError(apiError);
+        
+        toast({
+          title: "Generation failed",
+          description: errorMessage,
+          variant: "destructive"
+        });
+      }
     } catch (error) {
       setIsGenerating(false);
       toast({
@@ -111,6 +103,51 @@ const TemplateGenerator = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Template downloaded!",
+      description: "The HTML file has been saved to your downloads folder."
+    });
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!isUserAuthenticated || !generatedTemplate || !generationData) {
+      toast({
+        title: "Unable to save",
+        description: "Please log in and generate a template first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const templateTitle = `Generated Template - ${new Date().toLocaleDateString()}`;
+      
+      await apiClient.saveTemplate({
+        title: templateTitle,
+        description: `Generated from prompt: "${prompt.substring(0, 100)}..."`,
+        htmlContent: generatedTemplate,
+        subject: generationData.template.subject,
+        previewText: generationData.template.previewText,
+        templateType: generationData.template.templateType,
+        industry: generationData.template.industry,
+        prompt,
+        aiModel: generationData.generation.model,
+        tokensUsed: generationData.generation.tokensUsed.total,
+        tags: ['ai-generated'],
+      });
+
+      toast({
+        title: "Template saved! 💾",
+        description: "Your template has been saved to your template library."
+      });
+    } catch (error) {
+      toast({
+        title: "Save failed",
+        description: handleApiError(error),
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -144,16 +181,26 @@ const TemplateGenerator = () => {
               {prompt.length}/{VALIDATION_LIMITS.PROMPT_MAX_LENGTH} characters
             </div>
             
+            {!isUserAuthenticated && (
+              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-yellow-800">Authentication Required</p>
+                  <p className="text-sm text-yellow-600">Please log in to generate AI-powered email templates.</p>
+                </div>
+              </div>
+            )}
+
             <Button 
               onClick={handleGenerate}
-              disabled={isGenerating}
+              disabled={isGenerating || !isUserAuthenticated}
               className="w-full"
               variant="hero"
             >
               {isGenerating ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  Generating...
+                  Generating with AI...
                 </>
               ) : (
                 <>
@@ -162,6 +209,21 @@ const TemplateGenerator = () => {
                 </>
               )}
             </Button>
+
+            {generationData && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="h-4 w-4 text-brand-purple" />
+                  <span className="text-sm font-medium">Generation Info</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                  <div>Model: {generationData.generation.model.split('.').pop()}</div>
+                  <div>Tokens: {generationData.generation.tokensUsed.total}</div>
+                  <div>Time: {(generationData.generation.generationTime / 1000).toFixed(1)}s</div>
+                  <div>Remaining: {generationData.user.tokensRemaining}</div>
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* Preview/Output */}
@@ -173,7 +235,7 @@ const TemplateGenerator = () => {
               </h3>
               
               {generatedTemplate && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button variant="outline" size="sm" onClick={handleCopyHTML}>
                     <Copy className="h-4 w-4" />
                     Copy HTML
@@ -182,6 +244,12 @@ const TemplateGenerator = () => {
                     <Download className="h-4 w-4" />
                     Download
                   </Button>
+                  {isUserAuthenticated && (
+                    <Button variant="outline" size="sm" onClick={handleSaveTemplate}>
+                      <Sparkles className="h-4 w-4" />
+                      Save Template
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
