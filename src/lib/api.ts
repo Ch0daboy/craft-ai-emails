@@ -59,12 +59,26 @@ export interface GenerateTemplateRequest {
   responsive?: boolean;
 }
 
+export interface EmailCompatibilityIssue {
+  type: 'warning' | 'error';
+  message: string;
+  element?: string;
+  recommendation: string;
+}
+
+export interface EmailCompatibility {
+  score: number;
+  issues: EmailCompatibilityIssue[];
+  optimizations: string[];
+}
+
 export interface GenerateTemplateResponse {
   success: boolean;
   message: string;
   data: {
     template: {
       htmlContent: string;
+      originalHtml?: string;
       subject?: string;
       previewText?: string;
       prompt: string;
@@ -81,6 +95,7 @@ export interface GenerateTemplateResponse {
       generationTime: number;
       cost: number;
     };
+    compatibility: EmailCompatibility | null;
     user: {
       tokensRemaining: number;
       tokensUsed: number;

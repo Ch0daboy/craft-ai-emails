@@ -95,7 +95,8 @@ export const generateTemplate = async (
       message: 'Template generated successfully',
       data: {
         template: {
-          htmlContent: generatedTemplate.html,
+          htmlContent: generatedTemplate.optimizedHtml || generatedTemplate.html,
+          originalHtml: generatedTemplate.html,
           subject: generatedTemplate.subject,
           previewText: generatedTemplate.previewText,
           prompt,
@@ -108,6 +109,11 @@ export const generateTemplate = async (
           generationTime: generatedTemplate.generationTime,
           cost: generatedTemplate.cost,
         },
+        compatibility: generatedTemplate.compatibilityResult ? {
+          score: generatedTemplate.compatibilityResult.compatibilityScore,
+          issues: generatedTemplate.compatibilityResult.issues,
+          optimizations: generatedTemplate.compatibilityResult.optimizations,
+        } : null,
         user: {
           tokensRemaining: tokensRemaining - generatedTemplate.tokensUsed.total,
           tokensUsed: req.user.tokensUsed + generatedTemplate.tokensUsed.total,

@@ -1,10 +1,12 @@
 import { InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { getBedrockClient, DEFAULT_AI_MODEL, AI_MODELS, MODEL_PRICING } from '../config/aws';
 import { logger } from '../utils/logger';
+import { EmailOptimizer, EmailCompatibilityResult } from './emailOptimizer';
 
 // AI Service Response Types
 export interface AIGenerationResult {
   html: string;
+  optimizedHtml?: string;
   subject?: string;
   previewText?: string;
   tokensUsed: {
@@ -15,6 +17,7 @@ export interface AIGenerationResult {
   model: string;
   generationTime: number;
   cost: number;
+  compatibilityResult?: EmailCompatibilityResult;
 }
 
 export interface AIGenerationOptions {
@@ -103,8 +106,12 @@ export class AIService {
         cost,
       });
       
-      return {
+      // Optimize the HTML for email client compatibility
+      const compatibilityResult = await EmailOptimizer.optimizeForEmailClients(parsedResult.html);
+      
+      const result = {
         ...parsedResult,
+        optimizedHtml: compatibilityResult.optimizedHtml,
         tokensUsed: {
           input: inputTokens,
           output: outputTokens,
@@ -113,7 +120,16 @@ export class AIService {
         model,
         generationTime,
         cost,
+        compatibilityResult,
       };
+      
+      logger.info('Email optimization completed', {
+        compatibilityScore: compatibilityResult.compatibilityScore,
+        optimizationsCount: compatibilityResult.optimizations.length,
+        issuesCount: compatibilityResult.issues.length,
+      });
+      
+      return result;
       
     } catch (error) {
       const generationTime = Date.now() - startTime;
@@ -139,30 +155,44 @@ export class AIService {
       responsive = true,
     } = options;
     
-    const systemPrompt = `You are an expert email template designer specializing in creating responsive HTML email templates. Your task is to generate a complete, professional email template based on the user's requirements.
+    const systemPrompt = `You are an expert email template designer specializing in creating responsive HTML email templates that work perfectly across all major email clients. Your task is to generate a complete, professional email template based on the user's requirements.
 
-Requirements:
-- Create valid, email-client compatible HTML (tables for layout, inline CSS)
-- Ensure compatibility with Gmail, Outlook, Apple Mail, and other major clients
-- Use web-safe fonts and colors
-- Include proper fallbacks for images and modern CSS
-- Generate responsive design that works on mobile and desktop
-- Follow email design best practices for deliverability
+CRITICAL EMAIL COMPATIBILITY REQUIREMENTS:
+- Use TABLE-BASED LAYOUTS ONLY (no divs for layout, no flexbox, no CSS grid)
+- ALL styles must be INLINE (no external stylesheets or <style> blocks)
+- Use only EMAIL-SAFE CSS properties: background-color, color, font-family, font-size, font-weight, text-align, padding, margin, border, width, height, line-height, text-decoration, vertical-align
+- Include proper DOCTYPE: <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+- Add table attributes: cellpadding="0" cellspacing="0" border="0"
+- Use web-safe fonts with fallbacks: Arial, Helvetica, Georgia, Times New Roman, Courier New
+- All images must have alt attributes and display:block style
+- Ensure compatibility with Gmail, Outlook (all versions), Apple Mail, Yahoo, and other major clients
+- Include proper meta tags for email rendering
+- Use MSO conditional comments for Outlook-specific fixes
+- Generate mobile-responsive design using media queries
 
-Email Type: ${emailType}
-${industry ? `Industry: ${industry}` : ''}
-${brandColors ? `Brand Colors: ${brandColors.join(', ')}` : ''}
-${fromName ? `From Name: ${fromName}` : ''}
-${fromEmail ? `From Email: ${fromEmail}` : ''}
-Include Images: ${includeImages}
-Responsive: ${responsive}
+TEMPLATE SPECIFICATIONS:
+- Email Type: ${emailType}
+${industry ? `- Industry: ${industry}` : ''}
+${brandColors ? `- Brand Colors: ${brandColors.join(', ')}` : '- Use professional color palette'}
+${fromName ? `- From Name: ${fromName}` : ''}
+${fromEmail ? `- From Email: ${fromEmail}` : ''}
+- Include Images: ${includeImages}
+- Mobile Responsive: ${responsive}
+
+STRUCTURE REQUIREMENTS:
+- Start with proper email DOCTYPE and HTML structure
+- Include comprehensive <head> section with meta tags
+- Wrap all content in a main table (width="100%")
+- Use nested tables for complex layouts
+- Add Outlook conditional comments for MSO fixes
+- Include preheader text for inbox preview
 
 Please provide your response in the following format:
 
-SUBJECT: [Email subject line]
-PREVIEW: [Preview text that appears in inbox]
+SUBJECT: [Email subject line - compelling and under 50 characters]
+PREVIEW: [Preview text that appears in inbox - under 90 characters]
 HTML:
-[Complete HTML email template with inline CSS]`;
+[Complete HTML email template with proper DOCTYPE, meta tags, table-based layout, and inline CSS]`;
     
     return `${systemPrompt}
 

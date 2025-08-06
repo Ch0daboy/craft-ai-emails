@@ -1,11 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
-import { Sparkles, Download, Eye, Copy, AlertCircle, Zap } from "lucide-react";
+import { Sparkles, Download, Eye, Copy, AlertCircle, Zap, CheckCircle, XCircle, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { validatePrompt, sanitizeHTML, validateEmailHTML, createSafeErrorMessage, VALIDATION_LIMITS } from "@/lib/security";
-import { apiClient, handleApiError, GenerateTemplateResponse, isAuthenticated } from "@/lib/api";
+import { apiClient, handleApiError, GenerateTemplateResponse, isAuthenticated, EmailCompatibilityIssue } from "@/lib/api";
 
 const TemplateGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -14,6 +17,18 @@ const TemplateGenerator = () => {
   const [generationData, setGenerationData] = useState<GenerateTemplateResponse['data'] | null>(null);
   const { toast } = useToast();
   const isUserAuthenticated = isAuthenticated();
+
+  const getCompatibilityColor = (score: number): string => {
+    if (score >= 90) return "text-green-600";
+    if (score >= 75) return "text-yellow-600";
+    return "text-red-600";
+  };
+
+  const getCompatibilityBadgeColor = (score: number): "default" | "secondary" | "destructive" => {
+    if (score >= 90) return "default";
+    if (score >= 75) return "secondary";
+    return "destructive";
+  };
 
   const handleGenerate = async () => {
     try {
@@ -61,9 +76,13 @@ const TemplateGenerator = () => {
         setGenerationData(response.data);
         setIsGenerating(false);
         
+        const compatibilityInfo = response.data.compatibility 
+          ? ` Compatibility score: ${response.data.compatibility.score}%.`
+          : '';
+        
         toast({
           title: "Template generated! 🎉",
-          description: `Used ${response.data.generation.tokensUsed.total} tokens. ${response.data.user.tokensRemaining} tokens remaining.`
+          description: `Used ${response.data.generation.tokensUsed.total} tokens. ${response.data.user.tokensRemaining} tokens remaining.${compatibilityInfo}`
         });
       } catch (apiError) {
         setIsGenerating(false);
@@ -211,7 +230,7 @@ const TemplateGenerator = () => {
             </Button>
 
             {generationData && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg space-y-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Zap className="h-4 w-4 text-brand-purple" />
                   <span className="text-sm font-medium">Generation Info</span>
@@ -222,6 +241,30 @@ const TemplateGenerator = () => {
                   <div>Time: {(generationData.generation.generationTime / 1000).toFixed(1)}s</div>
                   <div>Remaining: {generationData.user.tokensRemaining}</div>
                 </div>
+                
+                {generationData.compatibility && (
+                  <>
+                    <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                      <Shield className="h-4 w-4 text-brand-purple" />
+                      <span className="text-sm font-medium">Email Compatibility</span>
+                      <Badge variant={getCompatibilityBadgeColor(generationData.compatibility.score)} className="text-xs">
+                        {generationData.compatibility.score}%
+                      </Badge>
+                    </div>
+                    
+                    {generationData.compatibility.optimizations.length > 0 && (
+                      <div className="text-xs text-green-600">
+                        ✅ {generationData.compatibility.optimizations.length} optimizations applied
+                      </div>
+                    )}
+                    
+                    {generationData.compatibility.issues.length > 0 && (
+                      <div className="text-xs text-amber-600">
+                        ⚠️ {generationData.compatibility.issues.length} compatibility issues detected
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </Card>
@@ -231,7 +274,7 @@ const TemplateGenerator = () => {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-semibold flex items-center gap-2">
                 <Eye className="h-6 w-6 text-brand-purple" />
-                Preview
+                Preview & Analysis
               </h3>
               
               {generatedTemplate && (
@@ -255,15 +298,109 @@ const TemplateGenerator = () => {
             </div>
             
             {generatedTemplate ? (
-              <div className="border rounded-lg overflow-hidden bg-white">
-                <iframe
-                  srcDoc={generatedTemplate}
-                  className="w-full h-96 border-none"
-                  title="Email Template Preview"
-                  sandbox="allow-same-origin"
-                  loading="lazy"
-                />
-              </div>
+              <Tabs defaultValue="preview" className="w-full">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="preview">Preview</TabsTrigger>
+                  <TabsTrigger value="compatibility">Compatibility</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="preview" className="space-y-4">
+                  <div className="border rounded-lg overflow-hidden bg-white">
+                    <iframe
+                      srcDoc={generatedTemplate}
+                      className="w-full h-96 border-none"
+                      title="Email Template Preview"
+                      sandbox="allow-same-origin"
+                      loading="lazy"
+                    />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="compatibility" className="space-y-4">
+                  {generationData?.compatibility ? (
+                    <div className="space-y-4">
+                      {/* Compatibility Score */}
+                      <div className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Shield className="h-5 w-5 text-brand-purple" />
+                          <div>
+                            <h4 className="font-medium">Email Client Compatibility</h4>
+                            <p className="text-sm text-muted-foreground">
+                              Optimized for Gmail, Outlook, Apple Mail, and other major clients
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant={getCompatibilityBadgeColor(generationData.compatibility.score)} className="text-lg px-3 py-1">
+                          {generationData.compatibility.score}%
+                        </Badge>
+                      </div>
+
+                      {/* Optimizations Applied */}
+                      {generationData.compatibility.optimizations.length > 0 && (
+                        <div className="p-4 border rounded-lg bg-green-50">
+                          <div className="flex items-center gap-2 mb-3">
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            <h4 className="font-medium text-green-800">Optimizations Applied</h4>
+                          </div>
+                          <div className="space-y-2">
+                            {generationData.compatibility.optimizations.map((optimization, index) => (
+                              <div key={index} className="text-sm text-green-700 flex items-start gap-2">
+                                <span className="text-green-500 mt-1">•</span>
+                                <span>{optimization}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Issues Found */}
+                      {generationData.compatibility.issues.length > 0 && (
+                        <div className="space-y-3">
+                          {generationData.compatibility.issues.map((issue, index) => (
+                            <Alert key={index} variant={issue.type === 'error' ? 'destructive' : 'default'}>
+                              <div className="flex items-start gap-2">
+                                {issue.type === 'error' ? 
+                                  <XCircle className="h-4 w-4 mt-0.5" /> : 
+                                  <AlertCircle className="h-4 w-4 mt-0.5" />
+                                }
+                                <div className="flex-1">
+                                  <AlertDescription className="font-medium mb-1">
+                                    {issue.message}
+                                  </AlertDescription>
+                                  <AlertDescription className="text-sm opacity-80">
+                                    {issue.recommendation}
+                                  </AlertDescription>
+                                  {issue.element && (
+                                    <Badge variant="outline" className="text-xs mt-2">
+                                      {issue.element}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </Alert>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* No Issues */}
+                      {generationData.compatibility.issues.length === 0 && (
+                        <div className="p-4 border rounded-lg bg-green-50 text-center">
+                          <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                          <h4 className="font-medium text-green-800 mb-1">Excellent Compatibility!</h4>
+                          <p className="text-sm text-green-700">
+                            No compatibility issues detected. Your template is ready for all major email clients.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center p-8 text-muted-foreground">
+                      <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Compatibility analysis will appear here after generation</p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             ) : (
               <div className="h-96 border-2 border-dashed border-border rounded-lg flex items-center justify-center text-muted-foreground">
                 <div className="text-center">
