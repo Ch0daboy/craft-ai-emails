@@ -1,37 +1,37 @@
 import { Router } from 'express';
+import {
+  updateProfile,
+  getPreferences,
+  updatePreferences,
+  changePassword,
+  getUserStats,
+  deleteAccount,
+} from '../controllers/userController';
+import { authenticateToken } from '../middleware/auth';
+import { validateRequest } from '../utils/validation';
+import { updateProfileSchema, updatePreferencesSchema } from '../utils/validation';
 
 const router = Router();
 
-// GET /api/users/profile
-router.get('/profile', (req, res) => {
-  res.status(501).json({
-    message: 'Get user profile endpoint - Coming soon',
-    endpoint: 'GET /api/users/profile',
-  });
-});
+// All user routes require authentication
+router.use(authenticateToken);
 
-// PUT /api/users/profile
-router.put('/profile', (req, res) => {
-  res.status(501).json({
-    message: 'Update user profile endpoint - Coming soon',
-    endpoint: 'PUT /api/users/profile',
-  });
-});
+// PUT /api/users/profile - Update user profile
+router.put('/profile', validateRequest(updateProfileSchema), updateProfile);
 
-// GET /api/users/preferences
-router.get('/preferences', (req, res) => {
-  res.status(501).json({
-    message: 'Get user preferences endpoint - Coming soon',
-    endpoint: 'GET /api/users/preferences',
-  });
-});
+// GET /api/users/preferences - Get user preferences
+router.get('/preferences', getPreferences);
 
-// PUT /api/users/preferences
-router.put('/preferences', (req, res) => {
-  res.status(501).json({
-    message: 'Update user preferences endpoint - Coming soon',
-    endpoint: 'PUT /api/users/preferences',
-  });
-});
+// PUT /api/users/preferences - Update user preferences
+router.put('/preferences', validateRequest(updatePreferencesSchema), updatePreferences);
+
+// PUT /api/users/password - Change password
+router.put('/password', changePassword);
+
+// GET /api/users/stats - Get user statistics
+router.get('/stats', getUserStats);
+
+// DELETE /api/users/account - Delete user account
+router.delete('/account', deleteAccount);
 
 export default router;

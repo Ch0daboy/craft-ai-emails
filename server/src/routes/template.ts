@@ -1,53 +1,47 @@
 import { Router } from 'express';
+import {
+  generateTemplate,
+  saveTemplate,
+  getUserTemplates,
+  getTemplate,
+  updateTemplate,
+  deleteTemplate,
+  toggleFavorite,
+} from '../controllers/templateController';
+import { authenticateToken, checkTokenLimit, userRateLimit } from '../middleware/auth';
+import { validateRequest } from '../utils/validation';
+import { generateTemplateSchema, saveTemplateSchema } from '../utils/validation';
 
 const router = Router();
 
-// POST /api/templates/generate
-router.post('/generate', (req, res) => {
-  res.status(501).json({
-    message: 'AI template generation endpoint - Coming soon',
-    endpoint: 'POST /api/templates/generate',
-  });
-});
+// All template routes require authentication
+router.use(authenticateToken);
 
-// GET /api/templates
-router.get('/', (req, res) => {
-  res.status(501).json({
-    message: 'Get user templates endpoint - Coming soon',
-    endpoint: 'GET /api/templates',
-  });
-});
+// POST /api/templates/generate - Generate AI template (rate limited)
+router.post(
+  '/generate',
+  userRateLimit(5, 60000), // 5 requests per minute
+  checkTokenLimit(50), // Require 50 tokens
+  validateRequest(generateTemplateSchema),
+  generateTemplate
+);
 
-// GET /api/templates/:id
-router.get('/:id', (req, res) => {
-  res.status(501).json({
-    message: 'Get template by ID endpoint - Coming soon',
-    endpoint: `GET /api/templates/${req.params.id}`,
-  });
-});
+// GET /api/templates - Get user templates with filtering/pagination
+router.get('/', getUserTemplates);
 
-// POST /api/templates
-router.post('/', (req, res) => {
-  res.status(501).json({
-    message: 'Save template endpoint - Coming soon',
-    endpoint: 'POST /api/templates',
-  });
-});
+// POST /api/templates - Save template to database
+router.post('/', validateRequest(saveTemplateSchema), saveTemplate);
 
-// PUT /api/templates/:id
-router.put('/:id', (req, res) => {
-  res.status(501).json({
-    message: 'Update template endpoint - Coming soon',
-    endpoint: `PUT /api/templates/${req.params.id}`,
-  });
-});
+// GET /api/templates/:id - Get specific template
+router.get('/:id', getTemplate);
 
-// DELETE /api/templates/:id
-router.delete('/:id', (req, res) => {
-  res.status(501).json({
-    message: 'Delete template endpoint - Coming soon',
-    endpoint: `DELETE /api/templates/${req.params.id}`,
-  });
-});
+// PUT /api/templates/:id - Update template
+router.put('/:id', validateRequest(saveTemplateSchema), updateTemplate);
+
+// DELETE /api/templates/:id - Delete (archive) template
+router.delete('/:id', deleteTemplate);
+
+// PUT /api/templates/:id/favorite - Toggle favorite status
+router.put('/:id/favorite', toggleFavorite);
 
 export default router;
