@@ -44,12 +44,16 @@ export interface JWTPayload {
 }
 
 export const generateToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): string => {
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured');
+  }
+  
   try {
     return jwt.sign(payload, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
+      expiresIn: JWT_EXPIRES_IN as string | number,
       issuer: 'emailcraft-ai',
       audience: 'emailcraft-users',
-    });
+    } as jwt.SignOptions);
   } catch (error) {
     logger.error('Token generation failed:', error);
     throw new Error('Token generation failed');
@@ -57,6 +61,10 @@ export const generateToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): string 
 };
 
 export const verifyToken = (token: string): JWTPayload => {
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured');
+  }
+  
   try {
     const payload = jwt.verify(token, JWT_SECRET, {
       issuer: 'emailcraft-ai',
@@ -77,6 +85,10 @@ export const verifyToken = (token: string): JWTPayload => {
 };
 
 export const generateRefreshToken = (userId: string): string => {
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured');
+  }
+  
   try {
     return jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, {
       expiresIn: '30d',
@@ -90,6 +102,10 @@ export const generateRefreshToken = (userId: string): string => {
 };
 
 export const verifyRefreshToken = (token: string): { userId: string } => {
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured');
+  }
+  
   try {
     const payload = jwt.verify(token, JWT_SECRET, {
       issuer: 'emailcraft-ai',

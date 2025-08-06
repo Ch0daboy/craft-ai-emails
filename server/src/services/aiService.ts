@@ -202,8 +202,8 @@ Generate a professional email template that meets all the requirements above.`;
     
     return {
       html: html || content,
-      subject: subject || undefined,
-      previewText: previewText || undefined,
+      subject: subject.length > 0 ? subject : undefined,
+      previewText: previewText.length > 0 ? previewText : undefined,
     };
   }
   
