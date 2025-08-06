@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
 import { Sparkles, Download, Eye, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { validatePrompt, sanitizeHTML, validateEmailHTML, createSafeErrorMessage, VALIDATION_LIMITS } from "@/lib/security";
 
 const TemplateGenerator = () => {
   const [prompt, setPrompt] = useState("");
@@ -12,20 +13,24 @@ const TemplateGenerator = () => {
   const { toast } = useToast();
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      toast({
-        title: "Please enter a description",
-        description: "Describe the email template you want to create.",
-        variant: "destructive"
-      });
-      return;
-    }
+    try {
+      // Validate input
+      const validation = validatePrompt(prompt);
+      if (!validation.isValid) {
+        toast({
+          title: "Invalid input",
+          description: validation.error,
+          variant: "destructive"
+        });
+        return;
+      }
 
-    setIsGenerating(true);
-    
-    // Simulate API call - in real app, this would call AWS Bedrock
-    setTimeout(() => {
-      const mockHTML = `<!DOCTYPE html>
+      setIsGenerating(true);
+      
+      // Simulate API call - in real app, this would call AWS Bedrock
+      setTimeout(() => {
+        try {
+          const mockHTML = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -54,14 +59,38 @@ const TemplateGenerator = () => {
     </div>
 </body>
 </html>`;
-      
-      setGeneratedTemplate(mockHTML);
+          
+          // Sanitize and validate the generated HTML
+          const sanitizedHTML = sanitizeHTML(mockHTML);
+          const htmlValidation = validateEmailHTML(sanitizedHTML);
+          
+          if (!htmlValidation.isValid) {
+            throw new Error(htmlValidation.error);
+          }
+          
+          setGeneratedTemplate(sanitizedHTML);
+          setIsGenerating(false);
+          toast({
+            title: "Template generated!",
+            description: "Your email template is ready for preview and export."
+          });
+        } catch (error) {
+          setIsGenerating(false);
+          toast({
+            title: "Generation failed",
+            description: createSafeErrorMessage(error),
+            variant: "destructive"
+          });
+        }
+      }, 2000);
+    } catch (error) {
       setIsGenerating(false);
       toast({
-        title: "Template generated!",
-        description: "Your email template is ready for preview and export."
+        title: "Error",
+        description: createSafeErrorMessage(error),
+        variant: "destructive"
       });
-    }, 2000);
+    }
   };
 
   const handleCopyHTML = () => {
@@ -109,7 +138,11 @@ const TemplateGenerator = () => {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               className="min-h-32 mb-6"
+              maxLength={VALIDATION_LIMITS.PROMPT_MAX_LENGTH}
             />
+            <div className="text-sm text-muted-foreground mb-6">
+              {prompt.length}/{VALIDATION_LIMITS.PROMPT_MAX_LENGTH} characters
+            </div>
             
             <Button 
               onClick={handleGenerate}
@@ -159,6 +192,8 @@ const TemplateGenerator = () => {
                   srcDoc={generatedTemplate}
                   className="w-full h-96 border-none"
                   title="Email Template Preview"
+                  sandbox="allow-same-origin"
+                  loading="lazy"
                 />
               </div>
             ) : (
