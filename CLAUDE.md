@@ -1,3 +1,19 @@
+
+###  Daily Workflow
+# 1. Check your Todos and start the next task.
+# 2. When you complete a task on your Todos list, commit the changes to the repo and create a pull request
+# 3. After creating a pull request save  your to do list right here
+# 4. After saving your Todos, use the /clear command
+# 5. Repeat.
+
+## Todos
+
+
+
+
+
+
+
 # Software Requirements Document (SRD)
 ## AI-Powered Email Template Builder Microsaas
 
