@@ -7,6 +7,7 @@ import rateLimit from 'express-rate-limit';
 
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
+import { checkDatabaseConnection } from './config/database';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import templateRoutes from './routes/template';
@@ -98,8 +99,16 @@ process.on('SIGINT', () => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   logger.info(`🚀 EmailCraft AI Server running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`Health check: http://localhost:${PORT}/health`);
+  
+  // Check database connection
+  const dbConnected = await checkDatabaseConnection();
+  if (!dbConnected) {
+    logger.error('⚠️  Database connection failed - some features may not work');
+  } else {
+    logger.info('✅ Database connection established');
+  }
 });
