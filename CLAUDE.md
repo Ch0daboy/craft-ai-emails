@@ -17,7 +17,7 @@
 # Software Requirements Document (SRD)
 ## AI-Powered Email Template Builder Microsaas
 
-### You are logged in as the root user in the aws cli, you are free to create, modify, or delete any resources for the project.
+### You are logged in as the root user in the aws cli, you are free to create, modify, or delete any resources for the project./
 
 ### 1. Project Overview
 
